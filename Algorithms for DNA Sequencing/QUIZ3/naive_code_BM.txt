@@ -1,0 +1,309 @@
+def naive(p, t):
+    occurrences = []
+    num_alignments=0
+    num_character_comparison=0
+    for i in range(len(t) - len(p) + 1):  # loop over alignments
+        match = True
+	num_alignments+=1
+        for j in range(len(p)):  # loop over characters
+	    num_character_comparison+=1
+            if t[i+j] != p[j]:  # compare characters
+                match = False
+                break
+        if match:
+            occurrences.append(i)  # all chars matched; record
+    return occurrences,num_alignments,num_character_comparison
+
+
+def reverseComplement(s):
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
+    t = ''
+    for base in s:
+        t = complement[base] + t
+    return t
+
+def readGenome(filename):
+    genome = ''
+    with open(filename, 'r') as f:
+        for line in f:
+            # ignore header line with genome information
+            if not line[0] == '>':
+                genome += line.rstrip()
+    return genome
+
+def readFastq(filename):
+    sequences = []
+    qualities = []
+    with open(filename) as fh:
+        while True:
+            fh.readline()  # skip name line
+            seq = fh.readline().rstrip()  # read base sequence
+            fh.readline()  # skip placeholder line
+            qual = fh.readline().rstrip() # base quality line
+            if len(seq) == 0:
+                break
+            sequences.append(seq)
+            qualities.append(qual)
+    return sequences, qualities
+
+
+def naive_2(p, t):
+    occurrences = []
+    for i in range(len(t) - len(p) + 1):  # loop over alignments
+        match = 0
+        for j in range(len(p)):  # loop over characters
+            if t[i+j] != p[j]:  
+		match=match+1;# compare characters
+        if match<=2:
+            occurrences.append(i)  # all chars matched; record
+    return occurrences
+
+
+def readFasta(filename):
+    sequences = []
+    name=[]
+    with open(filename) as fh:
+        while True:
+            title = fh.readline()  # skip name line
+            seq = fh.readline().rstrip()  # read base sequence
+            if len(title) == 0:
+                break
+            sequences.append(seq)
+            name.append(title)
+    return name,sequences
+
+from bm_preproc import BoyerMoore
+
+def boyer_moore(p, p_bm, t):
+    i = 0
+    occurrences = []
+    num_alignments=0
+    num_character_comparison=0
+    while i < len(t) - len(p) + 1:
+	num_alignments+=1
+        shift = 1
+        mismatched = False
+        for j in range(len(p)-1, -1, -1):
+	    num_character_comparison+=1
+            if p[j] != t[i+j]:
+                skip_bc = p_bm.bad_character_rule(j, t[i+j])
+                skip_gs = p_bm.good_suffix_rule(j)
+                shift = max(shift, skip_bc, skip_gs)
+                mismatched = True
+                break
+        if not mismatched:
+            occurrences.append(i)
+            skip_gs = p_bm.match_skip()
+            shift = max(shift, skip_gs)
+        i += shift
+    return occurrences,num_alignments,num_character_comparison
+
+p='GGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGG'
+q3= boyer_moore(p, BoyerMoore(p,'ATCG '), chr1[1][0])
+
+
+
+
+
+
+class Index(object):
+    def __init__(self, t, k):
+        ''' Create index from all substrings of size 'length' '''
+        self.k = k  # k-mer length (k)
+        self.index = []
+        for i in range(len(t) - k + 1):  # for each k-mer
+            self.index.append((t[i:i+k], i))  # add (k-mer, offset) pair
+        self.index.sort()  # alphabetize by k-mer
+    
+    def query(self, p):
+        ''' Return index hits for first k-mer of P '''
+        kmer = p[:self.k]  # query with first k-mer
+        i = bisect.bisect_left(self.index, (kmer, -1))  # binary search
+        hits = []
+        while i < len(self.index):  # collect matching index entries
+            if self.index[i][0] != kmer:
+                break
+            hits.append(self.index[i][1])
+            i += 1
+        return hits
+
+chr1_ind=kmer_index.Index(chr1[1][0],8)
+query_rlt1=chr1_ind.query(p)
+query_rlt2=[x-8 for x in chr1_ind.query(p[8:])]
+query_rlt3=[x-16 for x in chr1_ind.query(p[16:])]
+
+all_query=sorted(query_rlt1 + query_rlt2 + query_rlt3)
+
+
+index=[]
+p='GGCGCGGTGGCTCACGCCTGTAAT'
+for i in all_query:
+	match = 0
+        for j in range(len(p)):  # loop over characters
+            if chr1[1][0][i+j] != p[j]:  
+		match=match+1;# compare characters
+        if match<=2:
+            index.append(i)  # all chars matched; record
+
+
+import bisect
+   
+class SubseqIndex(object):
+    """ Holds a subsequence index for a text T """
+
+    def __init__(self, t, k, ival):
+        """ Create index from all subsequences consisting of k characters
+            spaced ival positions apart.  E.g., SubseqIndex("ATAT", 2, 2)
+            extracts ("AA", 0) and ("TT", 1). """
+        self.k = k  # num characters per subsequence extracted
+        self.ival = ival  # space between them; 1=adjacent, 2=every other, etc
+        self.index = []
+        self.span = 1 + ival * (k - 1)
+        for i in range(len(t) - self.span + 1):  # for each subseq
+            self.index.append((t[i:i+self.span:ival], i))  # add (subseq, offset)
+        self.index.sort()  # alphabetize by subseq
+
+    def query(self, p):
+        """ Return index hits for first subseq of p """
+        subseq = p[:self.span:self.ival]  # query with first subseq
+        i = bisect.bisect_left(self.index, (subseq, -1))  # binary search
+        hits = []
+        while i < len(self.index):  # collect matching index entries
+            if self.index[i][0] != subseq:
+                break
+            hits.append(self.index[i][1])
+            i += 1
+        return hits
+
+
+
+
+
+import bisect
+   
+class SubseqIndex(object):
+
+def __init__(self, t, k, ival):
+     
+        self.k = k  # num characters per subsequence extracted
+        self.ival = ival  # space between them; 1=adjacent, 2=every other, etc
+        self.index = []
+        self.span = 1 + ival * (k - 1)
+        for i in range(len(t) - self.span + 1):  # for each subseq
+            self.index.append((t[i:i+self.span:ival], i))  # add (subseq, offset)
+        self.index.sort()  # alphabetize by subseq
+
+def query(self, p):
+      
+        subseq = p[:self.span:self.ival]  # query with first subseq
+        i = bisect.bisect_left(self.index, (subseq, -1))  # binary search
+        hits = []
+        while i < len(self.index):  # collect matching index entries
+            if self.index[i][0] != subseq:
+                break
+            hits.append(self.index[i][1])
+            i += 1
+        return hits
+
+p='GGCGCGGTGGCTCACGCCTGTAAT'
+t=chr1[1][0]
+
+subseq_ind = subseq_index.SubseqIndex(t, 8, 3)
+query_1=subseq_ind.query(p)
+query_2=[x-1 for i in subseq_ind.query(p[1:])]
+query_3=[x-2 for i in subseq_ind.query(p[2:])]
+
+all_query=sorted(query_1 + query_2 + query_3)
+
+
+
+def editDistance(x, y):
+    # Create distance matrix
+    D = []
+    for i in range(len(x)+1):
+        D.append([0]*(len(y)+1))
+       
+    # Initialize first row and column of matrix
+    for i in range(len(x)+1):
+        D[i][0] = i
+    for i in range(len(y)+1):
+        D[0][i] = 0
+       
+    # Fill in the rest of the matrix
+    for i in range(1, len(x)+1):
+        for j in range(1, len(y)+1):
+            distHor = D[i][j-1] + 1
+            distVer = D[i-1][j] + 1
+            if x[i-1] == y[j-1]:
+                distDiag = D[i-1][j-1]
+            else:
+                distDiag = D[i-1][j-1] + 1
+            D[i][j] = min(distHor, distVer, distDiag)
+       
+    # Edit distance is the value in the bottom right corner of the matrix
+    return min(D[-1][:])
+
+t=readFasta('chr1.GRCh38.excerpt.fasta')[1][0]
+p='GCTGATCGATCGTACG'
+editDistance(p, t)
+
+p='GATTTACCAGATTGAG'
+editDistance(p, t)
+
+
+def overlap(a, b, min_length=30):
+    """ Return length of longest suffix of 'a' matching
+        a prefix of 'b' that is at least 'min_length'
+        characters long.  If no such overlap exists,
+        return 0. """
+    start = 0  # start all the way at the left
+    while True:
+        start = a.find(b[:min_length], start)  # look for b's suffx in a
+        if start == -1:  # no more occurrences to right
+            return 0
+        # found occurrence; check for full suffix/prefix match
+        if b.startswith(a[start:]):
+            return len(a)-start
+        start += 1  # move just past previous match
+
+
+
+def readFastq(filename):
+    sequences = []
+    qualities = []
+    with open(filename) as fh:
+        while True:
+            fh.readline()  # skip name line
+            seq = fh.readline().rstrip()  # read base sequence
+            fh.readline()  # skip placeholder line
+            qual = fh.readline().rstrip() # base quality line
+            if len(seq) == 0:
+                break
+            sequences.append(seq)
+            qualities.append(qual)
+    return sequences
+
+
+
+reads=readFastq('ERR266411_1.for_asm.fastq')
+klen=30
+Kmerlist={}
+for eachread in range(len(reads)):
+	for ikmer in range(len(reads[eachread])-klen+1):	
+		kmer=reads[eachread][ikmer:ikmer+klen]
+		if not kmer in Kmerlist:	
+			Kmerlist[kmer]=set([eachread])
+		else:
+			Kmerlist[kmer].add(eachread)
+pairlist=[]
+for eachread in range(len(reads)):
+	guesslist=Kmerlist[reads[eachread][(len(reads[eachread])-30):len(reads[eachread])]]
+	guesslist.remove(eachread)
+	for guess in guesslist:
+		overlaplen=overlap(reads[eachread],reads[guess])
+		if not overlaplen==0:
+			pairlist.append([eachread,guess,overlaplen])
+
+
+
+
