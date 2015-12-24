@@ -1,0 +1,115 @@
+---
+title: "Regression Models Course Project"
+output: 
+  pdf_document: 
+    fig_crop: no
+---
+
+Author: **Fred Zhou**
+
+In this document, we will try to answer the following questions:
+
+- Q1: "Is an automatic or manual transmission better for MPG"
+
+- Q2: "Quantify the MPG difference between automatic and manual transmissions"
+
+By default, we assume that for the `mpg`, the lower the value the better. 
+
+(For `am`, `0` for automatic transmission, `1` for manual transmission.)
+
+
+###Q1. Is an automatic or manual transmission better for MPG
+To answer this question, we assume that the all the variables in the population follow normal distribution. Thus we first use Student's T test to address whehter there's difference in these two groups
+
+
+####Student's T-test between AUTOMATIC and MANUAL (alpha=0.05)
+```{r T-test, echo=TRUE,cache=TRUE}
+test_mpg=t.test(mtcars$mpg[mtcars$am==1],mtcars$mpg[mtcars$am==0])
+print(test_mpg)
+print(paste(
+'The P-value for the T-test between AUTOMATIC and MANUAL transmissions for the mpg is ',
+round(test_mpg$p.value,digits = 4),sep=''))
+print(paste(
+'Mean value for the mpg with AUTOMATIC transmissions:',
+round(test_mpg$estimate[1],digits = 2),sep=''))
+print(paste(
+'Mean value for the mpg with MANUAL transmissions:'
+,round(test_mpg$estimate[2],digits = 2),sep=''))
+```
+
+Thus we could address that indeed the types of transmission will affect the `mpg`, and on average `AUTOMATIC` will bear a *higher consumption of fuel* against the `MANUAL` transmission, and the average difference is around *7.24* miles per Gallon used.
+
+###Q2. Quantify the MPG difference between automatic and manual transmissions
+####Correlation analysis winthin all variables against the mpg
+```{r covariant, echo=TRUE,cache=TRUE}
+sort(abs(cor(mtcars)[1,]))
+```
+We already get the hint that the `AUTOMATIC/MANUAL` have impacts on the fuel consumption, thus from the correlation analsis we could guess that any variant with a higher correlation value against `AUTOMATIC/MANUAL` may contribute to the fuel consumption. including:
+
+1.`vs` - V/S
+
+2.`drat` - Rear axle ratio
+
+3.`hp` - Gross horsepower
+
+4.`disp` - Displacement (cu.in.)
+
+5.`cyl` - Number of cylinders
+
+6.`wt` - Weight (1000 lbs)
+
+Thus, we could guess that it's reasonable to include any variable into the linear regressions. We could make a most general form of regression, then add in more variants to further optimize our model.
+
+
+#### General model
+We only take the `am` as variables to do the linear regression first:
+```{r regression_1, echo=TRUE,cache=TRUE}
+fit_1 <- lm(mpg~am, data = mtcars)
+summary(fit_1)
+```
+Based on the stat data we could address:
+
+- On average, AUTOMATIC car have 17.15 MPG and MANUAL transmission cars have 7.25 MPG more
+
+- The R^2 value is only 0.36, which means that our current model only explains 36% of the variance
+
+
+#### Multivariate model - adapted selection of variants
+```{r regression_2, echo=TRUE,cache=TRUE}
+fit_2 = step(lm(data = mtcars, mpg ~ .),trace=0,steps=50000)
+summary(fit_2)
+```
+
+###Summary
+This model explains 84% of the variance in miles per gallon (`mpg`), which is accaptable for the predicion of `mpg` with new data.
+Based on the multivariate model we could address:
+
+- `MANUAL` is  beneficial for the fuel saving, after model adjusting the value comes to be *2.936* miles per gallon.
+
+- `wt` affect huge against the `mpg`, which is appearant since more load will eventually consume more fuel.
+
+###APPENDIX 
+
+####Visualize the data between AUTOMATIC and MANUAL
+```{r Visualize, echo=FALSE,cache=TRUE,fig.align='left'}
+boxplot(mpg ~ am,data=mtcars,
+        ylab='mpg (Miles per Gallon)', 
+        xlab='Transmission',
+        names=c('automatic','manual'),
+        main='Transmission vs mpg')
+```
+
+####Comparision of general and multivariate model
+
+1.ANOVA
+
+```{r ANOVA, echo=TRUE,cache=TRUE}
+anova(fit_2, fit_1)
+```
+
+2.Residual diagnostics for multivariate model
+
+```{r residue, echo=TRUE,cache=TRUE}
+par(mfrow = c(2,2))
+plot(fit_2)
+```

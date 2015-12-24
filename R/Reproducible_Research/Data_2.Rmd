@@ -1,0 +1,93 @@
+---
+title: "National Weather Service Storm Data"
+output: html_document
+---
+### Author: *Fred Zhou*
+
+## Question needs to answer:
+- **Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?**
+
+  The sum of FATALITIES and INJURIES will be taken against each EVTYPE by function `aggregrate`, and the top 5 EVTYPE with values will be given by plot (ggplot2).
+
+- **Across the United States, which types of events have the greatest economic consequences?**
+
+  The sum of PROPDMG and CROPDMG will be determined by their EXPressions and sum against each EVTYPE by function `aggregrate`, and the top 5 EVTYPE with values will be given by table.
+  
+## Data Processing
+
+### Loading and preprocessing the data
+
+```{r read_data,echo=T,cache.vars=data,cache=TRUE}
+setwd('/Users/fred/Desktop/datasciencecoursera/R/Reproducible_Research/')
+data=read.table('/Users/fred/Downloads/repdata-data-StormData.csv',sep=',',stringsAsFactors=F,header=T,nrows=-1)
+```
+
+### Pre-processing for Question 1
+
+```{r Harmful_EVTYPE,echo=T,results='asis',warning=F,cache=TRUE,warning=F,fig.width=12, fig.height=6}
+library(xtable)
+library(ggplot2)
+Harmful_EVTYPE=aggregate(data[,23:24],by=list(data[,8]),function(x) sum(x,na.rm=T))
+FATALITITES_EVTYPE=Harmful_EVTYPE[order(-Harmful_EVTYPE$FATALITIES),][1:5,]
+FATALITITES_EVTYPE$Class=rep('FATALITITES',5)
+INJURIES_EVTYPE=Harmful_EVTYPE[order(-Harmful_EVTYPE$INJURIES),][1:5,]
+INJURIES_EVTYPE$Class=rep('INJURIES',5)
+
+Merge=rbind(FATALITITES_EVTYPE,INJURIES_EVTYPE)
+names(Merge)[1]='EVTYPE'
+
+```
+
+### Pre-processing for Question 2
+
+```{r Money_damage,echo=T,results='asis',warning=F,cache=TRUE,warning=F,fig.width=12, fig.height=6}
+library(xtable)
+library(ggplot2)
+
+data$PROPDMGEXP_new[grepl("[0-9]",data$PROPDMGEXP)]=10^as.numeric(data$PROPDMGEXP[grepl("[0-9]",data$PROPDMGEXP)])
+data$PROPDMGEXP_new[is.na(data$PROPDMGEXP) | data$PROPDMGEXP=='-' |data$PROPDMGEXP =='?']=0
+data$PROPDMGEXP_new[grepl('-|?',data$PROPDMGEXP)]=0
+data$PROPDMGEXP_new[data$PROPDMGEXP=='B' |data$PROPDMGEXP=='b']=10^9
+data$PROPDMGEXP_new[data$PROPDMGEXP=='H' |data$PROPDMGEXP=='h']=10^2
+data$PROPDMGEXP_new[data$PROPDMGEXP=='K' |data$PROPDMGEXP=='k']=10^3
+data$PROPDMGEXP_new[data$PROPDMGEXP=='M' |data$PROPDMGEXP=='m']=10^6
+
+data$CROPDMGEXP_new[grepl("[0-9]",data$CROPDMGEXP)]=10^as.numeric(data$CROPDMGEXP[grepl("[0-9]",data$CROPDMGEXP)])
+data$CROPDMGEXP_new[is.na(data$CROPDMGEXP) | data$CROPDMGEXP=='-' |data$CROPDMGEXP =='?']=0
+data$CROPDMGEXP_new[grepl('-|?',data$CROPDMGEXP)]=0
+data$CROPDMGEXP_new[data$CROPDMGEXP=='B' |data$CROPDMGEXP=='b']=10^9
+data$CROPDMGEXP_new[data$CROPDMGEXP=='H' |data$CROPDMGEXP=='h']=10^2
+data$CROPDMGEXP_new[data$CROPDMGEXP=='K' |data$CROPDMGEXP=='k']=10^3
+data$CROPDMGEXP_new[data$CROPDMGEXP=='M' |data$CROPDMGEXP=='m']=10^6
+
+
+data$PROP_total=data$PROPDMG*data$PROPDMGEXP_new
+data$CROP_total=data$CROPDMG*data$CROPDMGEXP_new
+data$Money_total=data$PROP_total+data$CROP_total
+
+Money_EVTYPE=aggregate(data$Money_total,by=list(data$EVTYPE),function(x) sum(x,na.rm=T))
+
+Money_EVTYPE[,2]=round(Money_EVTYPE[,2]/10^9,digits = 2)
+names(Money_EVTYPE)=c('EVTYPE','Money_total (Billions)')
+Money_EVTYPE=Money_EVTYPE[order(-Money_EVTYPE$Money_total),]
+
+```
+
+##Results
+
+### Question 1
+
+```{r Q1_plot,echo=T,results='asis',warning=F,cache=TRUE,warning=F,fig.width=12, fig.height=6}
+qplot(INJURIES,FATALITIES,data=Merge,facets=Class~EVTYPE, 
+   main="Top 5 Event for FATALITIES and INJURIES",size=I(3),shape=Class,
+   xlab="", ylab="Sum of affected people number ",ylim=c(100,10000))
+```
+
+### Question 2
+
+```{r Q2_Table,echo=T,results='asis',warning=F,cache=TRUE,warning=F,fig.width=12, fig.height=6}
+library(xtable)
+library(ggplot2)
+
+print(xtable(Money_EVTYPE[1:5,], digits=2),type='html')
+```

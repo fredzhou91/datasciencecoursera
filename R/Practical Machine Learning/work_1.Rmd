@@ -1,0 +1,116 @@
+---
+title: "Practical Machine Learning - Course project"
+output: html_document
+---
+**Author: Fred ZHOU**
+
+In this work, we will try to apply the machine learning algorithm to classify the individual behavior based on data collected from the mobile device.
+
+Data collected from the following publication:
+
+*Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. *
+
+## 0. Loading Libraries
+
+```{r loading packages,echo=T,cache=TRUE,warning=FALSE,}
+library(caret)
+library(randomForest)
+library(rpart) 
+library(rattle)
+set.seed(12345678)
+```
+
+## 1. Import data
+
+```{r loading data,echo=T,cache=TRUE,cache=TRUE}
+training=read.csv('./pml-training.csv',stringsAsFactors = T,header=T)
+training_y=training$classe
+testing=read.csv('./pml-testing.csv',stringsAsFactors = T,header=T)
+```
+
+## 2. Clean data 
+
+### View dim of data
+
+```{r clean data,echo=T,cache=TRUE}
+dim(training)
+```
+
+### Cleaning NearZeroVariance Variables
+
+```{r NearZeroVariance,echo=T,cache=TRUE}
+NZV <- nearZeroVar(training, saveMetrics=TRUE)
+Col_id=NZV[,4]
+training=training[,Col_id]
+```
+
+### Removing ID column
+
+```{r Removing ID,echo=T,cache=TRUE}
+training=training[,-1]
+```
+
+### Clean variables with Too many NA (NA ratio < 0.6)
+
+```{r Clean NA,echo=T,cache=TRUE}
+Count_NA=apply(training,2,function(x) sum(is.na(x)))/dim(training)[1]
+training=training[,Count_NA<0.6]
+dim(training)
+training$classe=training_y
+testing=testing[,names(testing) %in% names(training)] 
+```
+
+## 3. Training data with different model.
+
+### Split training into training and crossvalidation
+
+```{r crossvalidation,echo=T,cache=TRUE}
+inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+tmp=training
+training <- tmp[inTrain, ]
+crossvalid <- tmp[-inTrain, ]
+dim(training)
+dim(crossvalid)
+```
+
+### Train with Random forest
+
+```{r Random forest,echo=T,cache=TRUE}
+fit_rf=train(classe~ ., method='rf',data=training)
+pred_training_rf=predict(fit_rf,training)
+pred_cross_rf=predict(fit_rf,crossvalid)
+accuracy(pred_training_rf, training$classe)
+accuracy(pred_cross_rf, crossvalid$classe)
+```
+
+### Train with Generalized Boosted Regression Models
+
+```{r gbm,echo=T,cache=TRUE}
+fit_gbm=train(classe~ ., method='gbm',data=training)
+pred_training_gbm=predict(fit_gbm,training)
+pred_cross_gbm=predict(fit_gbm,crossvalid)
+accuracy(pred_training_gbm, training$classe)
+accuracy(pred_cross_gbm, crossvalid$classe)
+```
+
+### Train with Linear Discriminant Analysis
+
+```{r lda,echo=T,cache=TRUE}
+fit_lda=train(classe~ ., method='lda',data=training)
+pred_training_lda=predict(fit_lda,training)
+pred_cross_lda=predict(fit_lda,crossvalid)
+accuracy(pred_training_lda, training$classe)
+accuracy(pred_cross_lda, crossvalid$classe)
+```
+
+
+### Stack moultiple model with random forest
+
+```{r Stack,echo=T,cache=TRUE}
+pred_training=data.frame(pred_training_rf,pred_training_gbm,pred_training_lda,classe=training$diagnosis)
+fit_stack=train(diagnosis~.,method='rf',data=pred_training)
+pred_training_stack=predict(fit_stack,training)
+pred_cross_stack=predict(fit_stack,crossvalid)
+accuracy(pred_training_stack, training$classe)
+accuracy(pred_cross_stack, crossvalid$classe)
+```

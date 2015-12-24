@@ -1,0 +1,89 @@
+---
+title: "Statistical_inference_2"
+output: pdf_document
+---
+
+Author: *Fred Zhou*
+
+Using `ToothGrowth` data and compare odontoblasts growth by `supp` and `dose`
+
+##Basic summary
+
+```{r}
+#Import data
+data(ToothGrowth)
+#Visualize data
+head(ToothGrowth)
+#change dose to factor
+ToothGrowth$dose=factor(ToothGrowth$dose)
+#Basic summary
+summary(ToothGrowth)
+#Plot visulaization
+boxplot(len ~ supp + dose, data=ToothGrowth,ylab='odontoblasts len',main='odontoblasts len vs supplement and dosage ')
+```
+
+### Guess
+- **Vitamine C could facilite the growth of odontoblasts. **
+
+- **Low and medium dose (0.5 and 1 mg/day) of VC supplied with orange juice seems to favor the odontoblasts growth of guinea pigs compared with ascorbic acid.**
+
+- **For high dose (2 mg/day), the effect of orange juice and ascorbic acid seems to be same.**
+
+
+##1. Effect of supplement and dosage
+
+Assume that variance in each condition are the same. The Two-way ANOVA is adopted to see the effect of both supply and dosage.
+
+
+The NULL hypothesis `H0`: 
+
+1.The population means of `len` in `OJ` and `VC` (`supp`) are the same.
+
+2.The population means of `len` in `0.5`, `1` and `2` (`dose`) are the same.
+
+3.There is no interaction between the two factors (`supp` and `dose`).
+
+```{r}
+#Two-way ANOVA
+two_way=aov(len ~ supp*dose,data=ToothGrowth)
+summary(two_way)
+```
+
+Result reject all items in NULL hypothesis `H0` in the `95%` confidient intervals.
+Which indicate that:
+
+1. The `supply` affects the odontoblasts growth (`P-value = 0.000231`)
+
+2. The `dose` affects the odontoblasts growth (`P-value < 2e-16`)
+
+3. There is interaction between `OJ` and `VC` (`P-value = 0.021860`), which means that the supply may affect the Vitamine C functioning on the pig.
+
+We will further test effect within each group using the `Two-way ANOVA Tukey post-hoc test` to test the mean value between differnt groups.
+
+
+
+##2. Effect on the odontoblasts growth
+
+All the NULL hypothesis `H0` is the mean value is same.
+
+```{r}
+#Two-way ANOVA
+TukeyHSD(two_way)
+```
+
+
+- In the `$supp` test, the NULL hypothesis `H0` is rejected (`adj P-value < 0.0002312`), indicating the effects for the `VC` and `OJ` is statistically different, with mean value of odontoblasts length 3.7 longer in OJ treatment.
+
+- In the `$dose` test, the NULL hypothesis `H0` is rejected in all the dosase comparement (`adj P-value = 2.7e-06 or 0`), indicating the positive effect of Vitamine C on the growth of odontoblasts, and the effect is most obvious between dosage `1` and `0.5`
+
+- In the `$supp:dose` test, only in following gropus no significant difference is found (95% confidence interval):
+
+1. `VC:1-OJ:0.5` (`adj P-value = 0.2640208`)
+
+2. `OJ:2-OJ:1` (`adj P-value = 0.3187361`)
+
+3. `VC:2-OJ:1` (`adj P-value = 0.2936430`)
+
+4. `VC:2-OJ:2` (`adj P-value = 1`)
+
+The effect of Vitamine C tend to be satured for the growth of odontoblasts at dosage of 2 mg/day. All the guesses have been proved.
